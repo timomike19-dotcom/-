@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Новосибирск и окрестности — интерактивная карта</title>
+<meta name="description" content="Интерактивная карта Новосибирска и окрестностей: города, посёлки и районы с численностью населения и интересными фактами.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#f3f8fc; --ink:#0f2a3d; --muted:#5b7488; --line:#dbe7f0;
+  --blue:#1d6fd6; --blue-d:#154f9c; --teal:#10b2ad; --sky:#e8f4fc; --white:#fff;
+  --shadow:0 8px 28px rgba(16,60,100,.14); --shadow-s:0 2px 10px rgba(16,60,100,.10);
+  --r:16px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:"Inter","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+header.top{padding:14px 22px;background:linear-gradient(110deg,#0f4c9c 0%,#1d6fd6 55%,#10b2ad 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 2px 14px rgba(15,76,156,.35);position:relative;z-index:1100}
+header.top h1{margin:0;font-size:clamp(20px,2.6vw,28px);letter-spacing:-.02em;font-weight:800}
+header.top p{margin:3px 0 0;font-size:clamp(12.5px,1.4vw,14.5px);opacity:.92;max-width:760px}
+.switch{display:none;background:rgba(255,255,255,.18);border-radius:999px;padding:3px;gap:2px}
+.switch button{border:0;background:transparent;color:#fff;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600}
+.switch button.on{background:#fff;color:var(--blue-d)}
+
+.app{flex:1;min-height:0;display:grid;grid-template-columns:360px 1fr}
+.panel{background:var(--white);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:2}
+.search{padding:14px 14px 8px;position:relative}
+.search input{width:100%;padding:12px 40px 12px 40px;border:1.5px solid var(--line);border-radius:12px;font:inherit;font-size:15px;background:var(--bg);color:var(--ink);outline:none;transition:.2s}
+.search input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px rgba(29,111,214,.12)}
+.search svg{position:absolute;left:28px;top:50%;transform:translateY(-35%);width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round}
+.search .clear{position:absolute;right:24px;top:50%;transform:translateY(-35%);border:0;background:#d6e4ef;width:22px;height:22px;border-radius:50%;line-height:20px;font-size:14px;color:var(--ink);display:none;padding:0}
+.search.has .clear{display:block}
+.tabs{display:flex;gap:6px;padding:4px 14px 10px}
+.tabs button{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:8px 6px;font-size:13.5px;font-weight:600;color:var(--muted);transition:.2s}
+.tabs button.on{background:var(--sky);border-color:#b7d9f0;color:var(--blue-d)}
+.list{flex:1;overflow:auto;padding:0 10px 14px;overscroll-behavior:contain}
+.grp{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:12px 6px 6px}
+.item{width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1.5px solid transparent;background:transparent;border-radius:12px;transition:.18s;margin-bottom:2px}
+.item:hover{background:var(--sky)}
+.item.sel{background:linear-gradient(90deg,#e1f1fc,#e3f8f6);border-color:#a9d3ee}
+.ico{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:13px;background:var(--blue)}
+.ico.city{background:linear-gradient(135deg,#1d6fd6,#154f9c)}
+.ico.town{background:linear-gradient(135deg,#10b2ad,#0b8a95)}
+.ico.village{background:linear-gradient(135deg,#6aa6d8,#4a86bb)}
+.ico.science{background:linear-gradient(135deg,#7a5cf0,#4f3ac4)}
+.ico.district{background:linear-gradient(135deg,#8aa0b3,#5f7587)}
+.item b{display:block;font-size:15px;font-weight:700}
+.item small{color:var(--muted);font-size:12.5px}
+.empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:14px}
+.note{margin:6px 6px 0;padding:10px 12px;font-size:12.5px;color:var(--muted);background:var(--bg);border-radius:10px;line-height:1.45}
+
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#dcebf5}
+.leaflet-container{font-family:inherit}
+.pin{position:relative;width:100%;height:100%}
+.pin i{position:absolute;inset:0;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 2px 8px rgba(10,50,90,.45);transition:transform .2s,background .2s}
+.pin.town i{background:var(--teal)}
+.pin.village i{background:#6aa6d8}
+.pin.science i{background:#7a5cf0}
+.pin.sel i{background:#ff8a2a;transform:scale(1.25)}
+.pin.sel::after{content:"";position:absolute;inset:-10px;border-radius:50%;border:2.5px solid rgba(255,138,42,.8);animation:pulse 1.7s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.55);opacity:1}100%{transform:scale(1.5);opacity:0}}
+.leaflet-tooltip.lbl{background:rgba(255,255,255,.94);border:0;border-radius:8px;box-shadow:var(--shadow-s);color:var(--ink);font-weight:700;font-size:12.5px;padding:3px 8px}
+.leaflet-tooltip.lbl::before{display:none}
+.z-low .lbl-far{display:none}
+
+.card{position:absolute;left:16px;bottom:22px;width:min(400px,calc(100% - 32px));max-height:calc(100% - 44px);overflow:auto;background:#fff;border-radius:20px;box-shadow:var(--shadow);z-index:1000;transform:translateY(20px);opacity:0;pointer-events:none;transition:.28s cubic-bezier(.2,.8,.2,1)}
+.card.open{transform:none;opacity:1;pointer-events:auto}
+.card .head{padding:18px 54px 14px 20px;background:linear-gradient(120deg,#e4f2fc,#e1f8f5);border-radius:20px 20px 0 0}
+.card .tag{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--blue-d);background:#fff;border-radius:999px;padding:3px 10px;margin-bottom:8px}
+.card h2{margin:0;font-size:24px;letter-spacing:-.02em}
+.card .x{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:50%;border:0;background:#fff;box-shadow:var(--shadow-s);font-size:18px;line-height:1;color:var(--ink)}
+.card .x:hover{background:#f0f6fb}
+.card .body{padding:16px 20px 20px}
+.pop{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.pop .num{font-size:28px;font-weight:800;color:var(--blue-d);letter-spacing:-.02em}
+.pop .num.none{font-size:15px;color:var(--muted);font-weight:600}
+.pop .yr{font-size:13px;color:var(--muted)}
+.src{font-size:12px;color:var(--muted);margin:0 0 12px}
+.src a{color:var(--blue)}
+.card p.desc{margin:0 0 12px;line-height:1.55;font-size:14.8px}
+.card h3{margin:14px 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.card ul{margin:0;padding:0;list-style:none}
+.card li{position:relative;padding:8px 10px 8px 34px;margin-bottom:6px;background:var(--bg);border-radius:10px;font-size:14px;line-height:1.45}
+.card li::before{content:"✦";position:absolute;left:12px;top:8px;color:var(--teal)}
+.warn{font-size:12.5px;color:#7a5a12;background:#fff6dd;border-radius:10px;padding:8px 10px;margin-top:10px;line-height:1.45}
+.fail{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:30px;color:var(--muted);z-index:900}
+
+@media (max-width:860px){
+  header.top{padding:10px 14px;flex-wrap:wrap}
+  .switch{display:flex}
+  .app{grid-template-columns:1fr;position:relative}
+  .panel,.mapwrap{grid-area:1/1}
+  body.v-map .panel{visibility:hidden}
+  body.v-list .mapwrap{visibility:hidden}
+  .panel{border-right:0}
+  .card{left:8px;right:8px;bottom:8px;width:auto;max-height:52%;border-radius:18px}
+  .card .head{padding:14px 52px 10px 16px}
+  .card h2{font-size:21px}
+  .card .body{padding:12px 16px 16px}
+  .pop .num{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body class="v-map">
+
+<header class="top">
+  <div>
+    <h1>Новосибирск и окрестности</h1>
+    <p>Интерактивная карта: нажимайте на города и посёлки, чтобы узнать, сколько в них живёт людей и чем они интересны.</p>
+  </div>
+  <div class="switch" role="tablist" aria-label="Режим просмотра">
+    <button id="swMap" class="on" type="button">Карта</button>
+    <button id="swList" type="button">Список</button>
+  </div>
+</header>
+
+<main class="app">
+  <aside class="panel">
+    <div class="search" id="searchBox">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" autocomplete="off" placeholder="Найти населённый пункт…" aria-label="Поиск по названию">
+      <button class="clear" id="clr" type="button" aria-label="Очистить поиск">×</button>
+    </div>
+    <div class="tabs">
+      <button id="tabPlaces" class="on" type="button">Населённые пункты</button>
+      <button id="tabDist" type="button">Районы города</button>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <section class="mapwrap">
+    <div id="map" aria-label="Карта Новосибирска и окрестностей"></div>
+    <div class="fail" id="fail">Не удалось загрузить библиотеку карты ни с одного из серверов (cdnjs, jsDelivr, unpkg). Проверьте интернет, отключите блокировщики или VPN-фильтры и обновите страницу. Список мест слева работает и без карты.</div>
+    <article class="card" id="card" aria-live="polite"></article>
+  </section>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+var STAT_URL = "https://54.rosstat.gov.ru/";
+var STAT_NAME = "Новосибирскстат (Росстат)";
+var NOTE_NO_DATA = "Проверенная численность населения в этот файл не включена — чтобы не публиковать неточные цифры.";
+
+/* Население: Новосибирск — на 1 января 2024 г., остальные города и Кольцово — на 1 января 2023 г. (Новосибирскстат).
+   Там, где проверенных данных нет, pop = null. Координаты — реальные, округлены до сотых/тысячных долей градуса. */
+var PLACES = [
+ {id:"novosibirsk",name:"Новосибирск",type:"Город, городской округ",kind:"city",grp:"near",lat:55.0302,lng:82.9204,zoom:11,
+  pop:1633900,year:"на 1 января 2024 г.",srcName:STAT_NAME,srcUrl:"https://54.rosstat.gov.ru/storage/mediabank/54_PRESS058_2024.pdf",
+  desc:"Столица Сибири и крупнейший город региона, административный центр Новосибирской области и Сибирского федерального округа. Город вырос вокруг железнодорожного моста через Обь.",
+  facts:["Основан в 1893 году.","Третий по численности населения город России.","С 1937 года — центр Новосибирской области, с 2000 года — центр Сибирского федерального округа.","Возник как посёлок строителей моста Транссибирской магистрали через Обь."]},
+ {id:"akademgorodok",name:"Академгородок",type:"Научный городок (часть Новосибирска)",kind:"science",grp:"near",lat:54.8480,lng:83.1060,zoom:13,
+  pop:null,popNote:"Академгородок — не самостоятельный населённый пункт, а часть города Новосибирска (Советский район), поэтому отдельной численности здесь нет, а население всего города к нему не относится.",
+  desc:"Научный центр на юго-востоке Новосибирска, в окружении леса недалеко от берега Обского моря. Здесь работают институты Сибирского отделения Российской академии наук и Новосибирский государственный университет.",
+  facts:["Создан в конце 1950-х годов как центр Сибирского отделения Академии наук СССР.","Административно входит в Советский район Новосибирска."]},
+ {id:"koltsovo",name:"Кольцово",type:"Рабочий посёлок, наукоград (городской округ)",kind:"science",grp:"near",lat:54.9406,lng:83.1850,zoom:13,
+  pop:20900,year:"на 1 января 2023 г.",srcName:STAT_NAME,srcUrl:STAT_URL,
+  desc:"Наукоград к востоку от Новосибирска, рядом с международным аэропортом Толмачёво. Здесь сосредоточены научные организации в сфере биотехнологий и вирусологии.",
+  facts:["Здесь находится государственный научный центр вирусологии и биотехнологии «Вектор».","В посёлке работает Биотехнопарк Кольцово — площадка для исследований, разработок и производства в биотехнологиях."]},
+ {id:"krasnoobsk",name:"Краснообск",type:"Рабочий посёлок (Новосибирский район)",kind:"town",grp:"near",lat:54.9100,lng:82.9950,zoom:13,
+  pop:null,popNote:NOTE_NO_DATA,
+  desc:"Посёлок рядом с западной границей Новосибирска, сформировавшийся вокруг научных институтов сельскохозяйственной науки. Сегодня это один из самых заметных пригородов с активной жилой застройкой.",
+  facts:["Расположен в Новосибирском районе Новосибирской области.","Известен как научный центр сельскохозяйственных исследований."]},
+ {id:"berdsk",name:"Бердск",type:"Город, городской округ",kind:"city",grp:"near",lat:54.7585,lng:83.0971,zoom:12,
+  pop:103000,year:"на 1 января 2023 г.",srcName:STAT_NAME,srcUrl:STAT_URL,
+  desc:"Второй по численности город области, расположенный на берегу Обского моря (Новосибирского водохранилища) к югу от Новосибирска. Популярное место отдыха у воды.",
+  facts:["Перепись 2021 года зафиксировала 102 850 жителей (в 1939 году — около 11 тысяч).","На территории города находится природный парк «Бердская коса»."]},
+ {id:"iskitim",name:"Искитим",type:"Город, городской округ",kind:"city",grp:"near",lat:54.6362,lng:83.3047,zoom:12,
+  pop:56800,year:"на 1 января 2023 г.",srcName:STAT_NAME,srcUrl:STAT_URL,
+  desc:"Крупный город к юго-востоку от Новосибирска, центр Искитимского района. Известен промышленными предприятиями, в том числе цементной промышленностью.",
+  facts:["Третий по численности город области после Новосибирска и Бердска.","Является городским округом, но одновременно районным центром."]},
+ {id:"ob",name:"Обь",type:"Город, городской округ",kind:"city",grp:"near",lat:54.9946,lng:82.6987,zoom:12,
+  pop:30800,year:"на 1 января 2023 г.",srcName:STAT_NAME,srcUrl:STAT_URL,
+  desc:"Город к западу от Новосибирска, важный транспортный узел на Транссибирской магистрали. На его территории расположен аэропорт Толмачёво.",
+  facts:["Аэропорт Толмачёво — главные воздушные ворота региона.","Расположен на Транссибе недалеко от Новосибирска."]},
+ {id:"krivodanovka",name:"Криводановка",type:"Село (Новосибирский район)",kind:"village",grp:"near",lat:55.1506,lng:83.0394,zoom:13,
+  pop:null,popNote:NOTE_NO_DATA,
+  desc:"Крупное село к северу от Новосибирска, центр Криводановского сельсовета Новосибирского района. Находится недалеко от Обского моря.",
+  facts:["Находится недалеко от Новосибирска и входит в зону его пригородной застройки."]},
+ {id:"mochishche",name:"Мочище",type:"Посёлок",kind:"village",grp:"near",lat:55.1100,lng:82.9500,zoom:13,
+  pop:null,popNote:NOTE_NO_DATA,
+  desc:"Населённый пункт к северу от Новосибирска, у границы города. Подробные проверенные сведения о нём в этот файл не включены.",
+  facts:[]},
+ {id:"kolyvan",name:"Колывань",type:"Рабочий посёлок, центр Колыванского района",kind:"town",grp:"region",lat:55.3114,lng:82.7339,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Рабочий посёлок к северо-западу от Новосибирска, административный центр Колыванского района.",facts:[]},
+ {id:"kochenevo",name:"Коченёво",type:"Рабочий посёлок, центр Коченёвского района",kind:"town",grp:"region",lat:55.0222,lng:82.2044,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Рабочий посёлок к западу от Новосибирска, административный центр Коченёвского района.",facts:[]},
+ {id:"moshkovo",name:"Мошково",type:"Рабочий посёлок, центр Мошковского района",kind:"town",grp:"region",lat:55.3000,lng:83.6000,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Рабочий посёлок к северо-востоку от Новосибирска, административный центр Мошковского района.",facts:[]},
+ {id:"toguchin",name:"Тогучин",type:"Город, центр Тогучинского района",kind:"city",grp:"region",lat:55.2260,lng:84.4040,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город к востоку от Новосибирска, административный центр Тогучинского района.",facts:[]},
+ {id:"cherepanovo",name:"Черепаново",type:"Город, центр Черепановского района",kind:"city",grp:"region",lat:54.2250,lng:83.3750,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город к югу от Новосибирска, административный центр Черепановского района.",facts:[]},
+ {id:"maslyanino",name:"Маслянино",type:"Рабочий посёлок, центр Маслянинского района",kind:"town",grp:"region",lat:54.3330,lng:84.2330,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Рабочий посёлок на юго-востоке области, административный центр Маслянинского района.",facts:[]},
+ {id:"ordynskoe",name:"Ордынское",type:"Рабочий посёлок, центр Ордынского района",kind:"town",grp:"region",lat:54.3667,lng:81.9167,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Рабочий посёлок на юге области, административный центр Ордынского района.",facts:[]},
+ {id:"bolotnoe",name:"Болотное",type:"Город, центр Болотнинского района",kind:"city",grp:"region",lat:55.6700,lng:84.4000,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на северо-востоке области, административный центр Болотнинского района.",facts:[]},
+ {id:"chulym",name:"Чулым",type:"Город, центр Чулымского района",kind:"city",grp:"region",lat:55.0983,lng:80.9667,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на западе области, административный центр Чулымского района.",facts:[]},
+ {id:"barabinsk",name:"Барабинск",type:"Город, центр Барабинского района",kind:"city",grp:"region",lat:55.3583,lng:78.3469,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на западе области, расположенный на Транссибирской магистрали, административный центр Барабинского района.",facts:[]},
+ {id:"kuybyshev",name:"Куйбышев",type:"Город, центр Куйбышевского района",kind:"city",grp:"region",lat:55.4500,lng:78.3167,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на западе области, административный центр Куйбышевского района.",facts:["Прежнее название города — Каинск."]},
+ {id:"tatarsk",name:"Татарск",type:"Город, центр Татарского района",kind:"city",grp:"region",lat:55.2167,lng:75.9667,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на западе области, административный центр Татарского района.",facts:[]},
+ {id:"kupino",name:"Купино",type:"Город, центр Купинского района",kind:"city",grp:"region",lat:54.3667,lng:77.3000,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на юго-западе области, административный центр Купинского района.",facts:[]},
+ {id:"karasuk",name:"Карасук",type:"Город, центр Карасукского района",kind:"city",grp:"region",lat:53.7333,lng:78.0500,zoom:12,pop:null,popNote:NOTE_NO_DATA,
+  desc:"Город на юго-западе области, административный центр Карасукского района.",facts:[]}
+];
+
+var DISTRICTS = ["Центральный","Железнодорожный","Заельцовский","Дзержинский","Калининский","Кировский","Ленинский","Октябрьский","Первомайский","Советский"];
+var NSK = PLACES[0];
+
+
+function loadLeaflet(done){
+  if(typeof L!=="undefined"){ done(true); return; }
+  var urls=["https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
+            "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"], i=0;
+  (function next(){
+    if(i>=urls.length){ done(false); return; }
+    var s=document.createElement("script"), over=false;
+    function fail(){ if(over) return; over=true; clearTimeout(t); s.onload=s.onerror=null; if(s.parentNode) s.parentNode.removeChild(s); next(); }
+    var t=setTimeout(fail,8000);
+    s.onload=function(){ if(over) return; if(typeof L!=="undefined"){ over=true; clearTimeout(t); done(true); } else { fail(); } };
+    s.onerror=fail;
+    s.src=urls[i++];
+    document.head.appendChild(s);
+  })();
+}
+
+/* ---------- утилиты ---------- */
+function $(id){return document.getElementById(id)}
+function norm(s){return String(s).toLowerCase().replace(/ё/g,"е")}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function fmt(n){return n.toLocaleString("ru-RU").replace(/\u00a0/g," ")}
+function isMobile(){return window.matchMedia("(max-width:860px)").matches}
+function glyph(p){return p.kind==="city"?"Г":p.kind==="town"?"П":p.kind==="science"?"Н":p.kind==="village"?"С":"Р"}
+
+var state = {tab:"places", selected:null, query:""};
+var map = null, markers = {};
+
+/* ---------- карта ---------- */
+function initMap(){
+  if(typeof L === "undefined"){ $("fail").style.display="grid"; return; }
+  map = L.map("map",{zoomControl:true,minZoom:6,maxZoom:18}).setView([54.95,83.0],10);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+  }).addTo(map);
+
+  PLACES.forEach(function(p){
+    var size = p.kind==="city" ? 22 : 18;
+    var icon = L.divIcon({className:"",html:'<div class="pin '+p.kind+'" data-id="'+p.id+'"><i></i></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
+    var m = L.marker([p.lat,p.lng],{icon:icon,title:p.name,keyboard:true,riseOnHover:true}).addTo(map);
+    m.bindTooltip(p.name,{permanent:true,direction:"right",offset:[size/2-2,0],className:"lbl"+(p.grp==="region"?" lbl-far":"")});
+    m.on("click",function(){select(p.id,{fromMap:true})});
+    markers[p.id]=m;
+  });
+
+  function zl(){ map.getContainer().classList.toggle("z-low", map.getZoom()<10); }
+  map.on("zoomend",zl); zl();
+  map.on("click",function(){ /* клик по пустому месту карты не закрывает карточку случайно */ });
+}
+
+function markPin(id,on){
+  var m = markers[id]; if(!m) return;
+  var el = m.getElement(); if(!el) return;
+  var pin = el.querySelector(".pin"); if(pin) pin.classList.toggle("sel",on);
+  m.setZIndexOffset(on?1000:0);
+}
+
+/* ---------- карточка ---------- */
+function cardHTML(p){
+  var pop;
+  if(p.pop){
+    pop = '<div class="pop"><span class="num">'+fmt(p.pop)+' чел.</span><span class="yr">'+esc(p.year)+'</span></div>'+
+          '<p class="src">Источник: <a href="'+esc(p.srcUrl)+'" target="_blank" rel="noopener">'+esc(p.srcName)+'</a></p>';
+  } else {
+    pop = '<div class="pop"><span class="num none">Численность: нет проверенных данных</span></div>';
+  }
+  var facts = (p.facts&&p.facts.length)
+    ? '<h3>Интересные факты</h3><ul>'+p.facts.map(function(f){return '<li>'+esc(f)+'</li>'}).join("")+'</ul>' : '';
+  var warn = (!p.pop && p.popNote) ? '<div class="warn">'+esc(p.popNote)+'</div>' : '';
+  return '<div class="head"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2></div>'+
+         '<button class="x" id="cardX" type="button" aria-label="Закрыть карточку">✕</button>'+
+         '<div class="body">'+pop+'<p class="desc">'+esc(p.desc)+'</p>'+facts+warn+'</div>';
+}
+function openCard(p){
+  var c = $("card");
+  c.innerHTML = cardHTML(p);
+  c.scrollTop = 0;
+  c.classList.add("open");
+  $("cardX").addEventListener("click",function(){ closeCard(); });
+}
+function closeCard(){
+  $("card").classList.remove("open");
+  if(state.selected && PLACES.some(function(p){return p.id===state.selected})) markPin(state.selected,false);
+  state.selected = null;
+  try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+  renderList();
+}
+
+/* ---------- выбор ---------- */
+function select(id,opts){
+  opts = opts||{};
+  var p = PLACES.filter(function(x){return x.id===id})[0];
+  var d = null;
+  if(!p){ d = DISTRICTS.filter(function(n){return "d-"+n===id})[0]; if(!d) return; }
+  if(state.selected) markPin(state.selected,false);
+  state.selected = id;
+
+  if(p){
+    markPin(id,true);
+    openCard(p);
+    if(map){ map.flyTo([p.lat,p.lng],p.zoom||12,{duration:.9}); }
+  } else {
+    var dist = {
+      name:"Район «"+d+"»", type:"Район города Новосибирска", kind:"district", pop:null,
+      popNote:"Численность населения района в этот файл не включена: проверенных данных нет. Границы районов на карте не показаны, так как достоверные границы в формате GeoJSON не подключены.",
+      desc:"Один из десяти административных районов Новосибирска. Население района входит в численность всего города и не является отдельным населённым пунктом.",
+      facts: d==="Советский" ? ["На территории Советского района находится Академгородок."] : []
+    };
+    openCard(dist);
+    if(map){ map.flyTo([NSK.lat,NSK.lng],11,{duration:.9}); }
+  }
+  try{ history.replaceState(null,"","#"+encodeURIComponent(id)); }catch(e){}
+  renderList();
+  if(isMobile() && !opts.fromMap){ setView("map"); }
+}
+
+/* ---------- список и поиск ---------- */
+function itemHTML(id,glyphCls,glyphTxt,name,sub){
+  return '<button class="item'+(state.selected===id?" sel":"")+'" type="button" data-id="'+esc(id)+'">'+
+    '<span class="ico '+glyphCls+'">'+glyphTxt+'</span><span><b>'+esc(name)+'</b><small>'+esc(sub)+'</small></span></button>';
+}
+function renderList(){
+  var box = $("list"), q = norm(state.query.trim()), html = "";
+  if(state.tab==="places"){
+    var found = PLACES.filter(function(p){return !q || norm(p.name).indexOf(q)>-1});
+    var near = found.filter(function(p){return p.grp==="near"});
+    var reg = found.filter(function(p){return p.grp==="region"});
+    function sub(p){return p.pop ? fmt(p.pop)+" чел." : p.type}
+    if(near.length){ html += '<div class="grp">Новосибирск и ближайшие окрестности</div>'+near.map(function(p){return itemHTML(p.id,p.kind,glyph(p),p.name,sub(p))}).join(""); }
+    if(reg.length){ html += '<div class="grp">Районные центры области</div>'+reg.map(function(p){return itemHTML(p.id,p.kind,glyph(p),p.name,sub(p))}).join(""); }
+    if(!found.length){ html = '<div class="empty">Ничего не найдено по запросу «'+esc(state.query)+'».</div>'; }
+    else { html += '<div class="note">Г — город, П — рабочий посёлок, С — село, Н — научный центр. Численность указана только там, где есть проверенные данные Новосибирскстата.</div>'; }
+  } else {
+    var ds = DISTRICTS.filter(function(n){return !q || norm(n).indexOf(q)>-1});
+    html += '<div class="grp">Районы Новосибирска</div>';
+    if(ds.length){ html += ds.map(function(n){return itemHTML("d-"+n,"district","Р",n,"Район Новосибирска")}).join(""); }
+    else { html += '<div class="empty">Район не найден.</div>'; }
+    html += '<div class="note">Достоверные границы районов в формате GeoJSON не подключены, поэтому на карте они не выделены — районы показаны списком.</div>';
+  }
+  box.innerHTML = html;
+}
+
+function setTab(t){
+  state.tab = t;
+  $("tabPlaces").classList.toggle("on",t==="places");
+  $("tabDist").classList.toggle("on",t==="districts");
+  renderList();
+}
+function setView(v){
+  document.body.classList.toggle("v-map",v==="map");
+  document.body.classList.toggle("v-list",v==="list");
+  $("swMap").classList.toggle("on",v==="map");
+  $("swList").classList.toggle("on",v==="list");
+  if(v==="map" && map){ setTimeout(function(){map.invalidateSize()},60); }
+}
+
+/* ---------- события ---------- */
+function bind(){
+  $("list").addEventListener("click",function(e){
+    var b = e.target.closest(".item"); if(!b) return;
+    select(b.getAttribute("data-id"));
+  });
+  var input = $("q");
+  input.addEventListener("input",function(){
+    state.query = input.value;
+    $("searchBox").classList.toggle("has",!!input.value);
+    if(state.tab==="districts" && false){}
+    renderList();
+  });
+  input.addEventListener("keydown",function(e){
+    if(e.key==="Enter"){
+      var first = $("list").querySelector(".item");
+      if(first){ select(first.getAttribute("data-id")); input.blur(); }
+    }
+  });
+  $("clr").addEventListener("click",function(){
+    input.value=""; state.query=""; $("searchBox").classList.remove("has"); renderList(); input.focus();
+  });
+  $("tabPlaces").addEventListener("click",function(){setTab("places")});
+  $("tabDist").addEventListener("click",function(){setTab("districts")});
+  $("swMap").addEventListener("click",function(){setView("map")});
+  $("swList").addEventListener("click",function(){setView("list")});
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape" && state.selected){ closeCard(); } });
+  window.addEventListener("resize",function(){ if(map) map.invalidateSize(); });
+}
+
+/* ---------- старт ---------- */
+renderList();
+bind();
+setView("map");
+loadLeaflet(function(ok){
+  if(ok){ initMap(); } else { $("fail").style.display="grid"; }
+  var h = decodeURIComponent((location.hash||"").replace(/^#/,""));
+  if(h){ select(h,{fromMap:true}); }
+});
+})();
+</script>
+</body>
+</html>
